@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Merger</title>
+    <title>CSV Merger</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
 
@@ -337,7 +338,7 @@
             100% { background-position: -200% 0; }
         }
 
-        .excel-count {
+        .csv-count {
             margin-top: 10px;
             color: #34d399;
             font-weight: 600;
@@ -373,21 +374,21 @@
     <div class="container">
         <div class="header">
             <div class="logo">🔗</div>
-            <h1>Excel Unifier</h1>
-            <p class="subtitle">Merge all Excel files into one powerful spreadsheet</p>
+            <h1>CSV Unifier</h1>
+            <p class="subtitle">Merge all CSV files into one unified Excel spreadsheet</p>
         </div>
         
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📊</div>
             <div class="upload-text">Drop your ZIP file here</div>
-            <div class="upload-hint">or click to browse • ZIP with Excel files • Max 50MB</div>
+            <div class="upload-hint">or click to browse • ZIP with CSV files • Max 50MB</div>
             <input type="file" id="fileInput" accept=".zip">
         </div>
 
         <div class="file-info" id="fileInfo">
             <div class="file-name" id="fileName"></div>
             <div class="file-size" id="fileSize"></div>
-            <div class="excel-count" id="excelCount"></div>
+            <div class="csv-count" id="csvCount"></div>
             <div class="row-count" id="rowCount"></div>
         </div>
 
@@ -407,7 +408,7 @@
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
         const fileSize = document.getElementById('fileSize');
-        const excelCount = document.getElementById('excelCount');
+        const csvCount = document.getElementById('csvCount');
         const rowCount = document.getElementById('rowCount');
         const status = document.getElementById('status');
         const downloadBtn = document.getElementById('downloadBtn');
@@ -479,45 +480,43 @@
 
             try {
                 const zip = await JSZip.loadAsync(file);
-                const excelFiles = Object.keys(zip.files).filter(name => 
-                    (name.endsWith('.xlsx') || name.endsWith('.xls')) && !name.startsWith('__MACOSX')
+                const csvFiles = Object.keys(zip.files).filter(name => 
+                    name.endsWith('.csv') && !name.startsWith('__MACOSX')
                 );
 
-                if (excelFiles.length === 0) {
-                    showStatus('❌ No Excel files found in ZIP', 'error');
+                if (csvFiles.length === 0) {
+                    showStatus('❌ No CSV files found in ZIP', 'error');
                     progressBar.classList.remove('show');
                     return;
                 }
 
-                excelCount.textContent = `✓ Found ${excelFiles.length} Excel file${excelFiles.length > 1 ? 's' : ''}`;
+                csvCount.textContent = `✓ Found ${csvFiles.length} CSV file${csvFiles.length > 1 ? 's' : ''}`;
                 updateProgress(30);
 
-                // Array to store all rows from all files
+                // Array to store all rows from all CSV files
                 let allRows = [];
                 let processed = 0;
                 let totalRowsProcessed = 0;
 
-                for (const excelFile of excelFiles) {
-                    const content = await zip.files[excelFile].async('arraybuffer');
-                    const wb = XLSX.read(content, { type: 'array' });
-                    
-                    // Process all sheets in each workbook
-                    wb.SheetNames.forEach(sheetName => {
-                        const worksheet = wb.Sheets[sheetName];
-                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-                        
-                        if (jsonData.length > 0) {
-                            allRows = allRows.concat(jsonData);
-                            totalRowsProcessed += jsonData.length;
-                        }
+                for (const csvFile of csvFiles) {
+                    const content = await zip.files[csvFile].async('string');
+                    const parsed = Papa.parse(content, {
+                        header: true,
+                        skipEmptyLines: true,
+                        dynamicTyping: true
                     });
 
+                    if (parsed.data.length > 0) {
+                        allRows = allRows.concat(parsed.data);
+                        totalRowsProcessed += parsed.data.length;
+                    }
+
                     processed++;
-                    updateProgress(30 + (processed / excelFiles.length) * 60);
+                    updateProgress(30 + (processed / csvFiles.length) * 60);
                 }
 
                 if (allRows.length === 0) {
-                    showStatus('❌ No data found in Excel files', 'error');
+                    showStatus('❌ No data found in CSV files', 'error');
                     progressBar.classList.remove('show');
                     return;
                 }
@@ -530,7 +529,7 @@
                 XLSX.utils.book_append_sheet(workbook, mergedSheet, 'Merged Data');
 
                 updateProgress(100);
-                showStatus(`🎉 Successfully merged ${excelFiles.length} Excel file${excelFiles.length > 1 ? 's' : ''} with ${totalRowsProcessed.toLocaleString()} rows!`, 'success');
+                showStatus(`🎉 Successfully merged ${csvFiles.length} CSV file${csvFiles.length > 1 ? 's' : ''} with ${totalRowsProcessed.toLocaleString()} rows!`, 'success');
                 downloadBtn.classList.add('show');
                 convertMoreBtn.classList.add('show');
 
@@ -543,7 +542,7 @@
 
         downloadBtn.addEventListener('click', () => {
             if (workbook) {
-                XLSX.writeFile(workbook, 'merged_excel.xlsx');
+                XLSX.writeFile(workbook, 'merged_csvs.xlsx');
                 showStatus('✅ Excel file downloaded successfully!', 'success');
                 
                 // Create sparkles on download
@@ -570,7 +569,7 @@
             workbook = null;
             fileName.textContent = '';
             fileSize.textContent = '';
-            excelCount.textContent = '';
+            csvCount.textContent = '';
             rowCount.textContent = '';
         });
 
